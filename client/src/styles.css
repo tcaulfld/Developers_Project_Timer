@@ -652,14 +652,17 @@ textarea {
   left: 4px;
   right: 4px;
   border-radius: 10px;
-  padding: 6px 8px;
+  padding: 4px 8px;
   font-size: 0.75rem;
   font-weight: 600;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border: 1px solid transparent;
   background: color-mix(in srgb, var(--accent) 28%, var(--bg-2));
   color: var(--text);
-  line-height: 1.2;
+  line-height: 1.15;
+  box-sizing: border-box;
 }
 
 .error-banner {
