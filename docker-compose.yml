@@ -1,0 +1,14 @@
+services:
+  timer:
+    build: .
+    ports:
+      - "8787:8787"
+    volumes:
+      - timer-data:/data
+    environment:
+      PORT: "8787"
+      DATA_DIR: /data
+    restart: unless-stopped
+
+volumes:
+  timer-data:
