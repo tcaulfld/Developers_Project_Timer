@@ -58,6 +58,12 @@ export function CalendarView({ onClose }: Props) {
     [visible.gridStartMin, visible.gridEndMin],
   );
 
+  /** 8:30–17:00 band as % of the visible grid (full height when grid is exactly business hours). */
+  const businessBand = useMemo(
+    () => businessHoursBand(visible.gridStartMin, visible.gridEndMin),
+    [visible.gridStartMin, visible.gridEndMin],
+  );
+
   const rangeNote = visible.expanded
     ? `CST · 8:30 AM–5:00 PM default · expanded ${formatMinutesLabel(visible.gridStartMin)}–${formatMinutesLabel(visible.gridEndMin)} for sessions this week`
     : 'CST · 8:30 AM–5:00 PM (expands only when sessions fall outside)';
@@ -152,6 +158,11 @@ export function CalendarView({ onClose }: Props) {
                   </span>
                 </div>
                 <div className="day-col" style={{ flex: 1 }}>
+                  <div
+                    className="business-hours-band"
+                    style={businessBand}
+                    aria-hidden="true"
+                  />
                   {daySessions.map((s) => {
                     const style = blockStyle(
                       s,
@@ -325,5 +336,24 @@ function blockStyle(
   return {
     top: `${top}%`,
     height: `${Math.max(height, 3)}%`,
+  };
+}
+
+/** Map fixed business window onto whatever grid range is visible. */
+function businessHoursBand(
+  gridStartMin: number,
+  gridEndMin: number,
+): CSSProperties {
+  const span = Math.max(gridEndMin - gridStartMin, 1);
+  const bizStart = Math.max(DEFAULT_START_MIN, gridStartMin);
+  const bizEnd = Math.min(DEFAULT_END_MIN, gridEndMin);
+  if (bizEnd <= bizStart) {
+    return { display: 'none' };
+  }
+  const top = ((bizStart - gridStartMin) / span) * 100;
+  const height = ((bizEnd - bizStart) / span) * 100;
+  return {
+    top: `${top}%`,
+    height: `${height}%`,
   };
 }

@@ -629,14 +629,26 @@ textarea {
   position: relative;
   overflow: hidden;
   min-height: 360px;
-  background:
-    linear-gradient(to bottom, transparent 0, transparent calc(100% - 28%), color-mix(in srgb, var(--bg-0) 35%, transparent) calc(100% - 28%));
+  background: color-mix(in srgb, var(--bg-0) 40%, var(--bg-1));
+}
+
+/* Full 8:30 AM–5:00 PM relative to the visible grid (not a fixed 72% band). */
+.business-hours-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--accent-2) 14%, var(--bg-2));
+  border-top: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .cal-block {
   position: absolute;
   left: 4px;
   right: 4px;
+  z-index: 1;
   border-radius: 10px;
   padding: 4px 8px;
   font-size: 0.75rem;
