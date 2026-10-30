@@ -141,9 +141,6 @@ function quarterLabel(d: Date): string {
   return `Q${q}`;
 }
 
-/** Business day hours + after-hours blocks for calendar rendering. */
+/** Default calendar business window (America/Chicago). Grid expands only for out-of-window sessions. */
 export const BUSINESS_START = { h: 8, m: 30 };
 export const BUSINESS_END = { h: 17, m: 0 };
-export const AFTER_HOURS_START = { h: 21, m: 0 };
-export const AFTER_HOURS_END = { h: 24, m: 0 }; // midnight
-export const AFTER_HOURS_DAYS = new Set([4, 5, 6]); // Thu=4 Fri=5 Sat=6 (Mon=1)

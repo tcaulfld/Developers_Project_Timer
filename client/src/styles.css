@@ -583,10 +583,6 @@ textarea {
   min-height: 420px;
 }
 
-.week-grid.with-sat {
-  grid-template-columns: 72px repeat(6, 1fr);
-}
-
 .day-head,
 .time-label,
 .day-col {
@@ -635,16 +631,6 @@ textarea {
   min-height: 360px;
   background:
     linear-gradient(to bottom, transparent 0, transparent calc(100% - 28%), color-mix(in srgb, var(--bg-0) 35%, transparent) calc(100% - 28%));
-}
-
-.day-col.after-hours-zone {
-  background-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 72%,
-    color-mix(in srgb, var(--accent-2) 10%, transparent) 72%,
-    color-mix(in srgb, var(--accent-2) 10%, transparent) 100%
-  );
 }
 
 .cal-block {
@@ -703,8 +689,7 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .week-grid,
-  .week-grid.with-sat {
+  .week-grid {
     grid-template-columns: 56px repeat(3, 1fr);
     overflow-x: auto;
   }

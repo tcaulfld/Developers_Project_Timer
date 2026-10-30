@@ -2,9 +2,6 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { api } from '../api';
 import type { Session } from '../types';
 import {
-  AFTER_HOURS_DAYS,
-  AFTER_HOURS_END,
-  AFTER_HOURS_START,
   BUSINESS_END,
   BUSINESS_START,
   addDays,
@@ -19,7 +16,10 @@ interface Props {
   onClose: () => void;
 }
 
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const DEFAULT_START_MIN = BUSINESS_START.h * 60 + BUSINESS_START.m; // 8:30
+const DEFAULT_END_MIN = BUSINESS_END.h * 60 + BUSINESS_END.m; // 17:00
 
 export function CalendarView({ onClose }: Props) {
   const [anchor, setAnchor] = useState(() => startOfWorkWeek(new Date()));
@@ -27,13 +27,14 @@ export function CalendarView({ onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const weekStart = useMemo(() => startOfWorkWeek(anchor), [anchor]);
-  const days = useMemo(
-    () => Array.from({ length: 6 }, (_, i) => addDays(weekStart, i)),
+  // Always fetch Mon–Sun so we can decide whether Sat/Sun columns are needed.
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
   );
 
   const startYmd = chicagoYmd(weekStart);
-  const endYmd = chicagoYmd(addDays(weekStart, 5));
+  const endYmd = chicagoYmd(addDays(weekStart, 6));
   const sprints = sprintsOverlapping(startYmd, endYmd);
 
   useEffect(() => {
@@ -47,7 +48,19 @@ export function CalendarView({ onClose }: Props) {
       );
   }, [startYmd, endYmd]);
 
-  const hourLabels = useMemo(() => buildHourLabels(), []);
+  const visible = useMemo(
+    () => computeVisibleWindow(sessions, weekDays),
+    [sessions, weekDays],
+  );
+
+  const hourLabels = useMemo(
+    () => buildHourLabels(visible.gridStartMin, visible.gridEndMin),
+    [visible.gridStartMin, visible.gridEndMin],
+  );
+
+  const rangeNote = visible.expanded
+    ? `CST · 8:30 AM–5:00 PM default · expanded ${formatMinutesLabel(visible.gridStartMin)}–${formatMinutesLabel(visible.gridEndMin)} for sessions this week`
+    : 'CST · 8:30 AM–5:00 PM (expands only when sessions fall outside)';
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -55,7 +68,7 @@ export function CalendarView({ onClose }: Props) {
         <div className="modal-header">
           <div>
             <h2>Work week</h2>
-            <p>CST · 8:30 AM–5:00 PM · After-hours Thu/Fri/Sat 9:00 PM–12:00 AM</p>
+            <p>{rangeNote}</p>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
             ✕
@@ -104,7 +117,12 @@ export function CalendarView({ onClose }: Props) {
 
         {error ? <div className="error-banner">{error}</div> : null}
 
-        <div className="week-grid with-sat">
+        <div
+          className="week-grid"
+          style={{
+            gridTemplateColumns: `72px repeat(${visible.dayIndexes.length}, 1fr)`,
+          }}
+        >
           <div className="time-rail">
             <div className="day-head">CST</div>
             {hourLabels.map((h) => (
@@ -114,12 +132,11 @@ export function CalendarView({ onClose }: Props) {
             ))}
           </div>
 
-          {days.map((day, idx) => {
+          {visible.dayIndexes.map((idx) => {
+            const day = weekDays[idx];
             const ymd = chicagoYmd(day);
             const isSprintStart = sprints.some((s) => s.startYmd === ymd);
             const isSprintEnd = sprints.some((s) => s.endYmd === ymd);
-            const dow = idx + 1;
-            const showAfter = AFTER_HOURS_DAYS.has(dow);
             const daySessions = sessions.filter((s) => sessionTouchesDay(s, ymd));
 
             return (
@@ -134,12 +151,14 @@ export function CalendarView({ onClose }: Props) {
                     {isSprintEnd ? ' · sprint end' : ''}
                   </span>
                 </div>
-                <div
-                  className={`day-col${showAfter ? ' after-hours-zone' : ''}`}
-                  style={{ flex: 1 }}
-                >
+                <div className="day-col" style={{ flex: 1 }}>
                   {daySessions.map((s) => {
-                    const style = blockStyle(s, ymd, showAfter);
+                    const style = blockStyle(
+                      s,
+                      ymd,
+                      visible.gridStartMin,
+                      visible.gridEndMin,
+                    );
                     if (!style) return null;
                     const colors = colorForTimer(s.timerId);
                     const name = (s.projectNumber || s.timerLabel || 'Timer').trim();
@@ -168,6 +187,64 @@ export function CalendarView({ onClose }: Props) {
   );
 }
 
+interface VisibleWindow {
+  dayIndexes: number[];
+  gridStartMin: number;
+  gridEndMin: number;
+  expanded: boolean;
+}
+
+function computeVisibleWindow(sessions: Session[], weekDays: Date[]): VisibleWindow {
+  // Default: Mon–Fri (indexes 0–4)
+  const dayNeeded = new Set<number>([0, 1, 2, 3, 4]);
+  let gridStartMin = DEFAULT_START_MIN;
+  let gridEndMin = DEFAULT_END_MIN;
+
+  for (const s of sessions) {
+    for (let idx = 0; idx < weekDays.length; idx++) {
+      const ymd = chicagoYmd(weekDays[idx]);
+      if (!sessionTouchesDay(s, ymd)) continue;
+      dayNeeded.add(idx);
+
+      const { startMin, endMin } = sessionMinutesOnDay(s, ymd);
+      if (endMin <= startMin) continue;
+      gridStartMin = Math.min(gridStartMin, startMin);
+      gridEndMin = Math.max(gridEndMin, endMin);
+    }
+  }
+
+  // Snap expansion to sensible minute boundaries (keep default tight when unused).
+  gridStartMin = Math.max(0, Math.floor(gridStartMin / 30) * 30);
+  gridEndMin = Math.min(24 * 60, Math.ceil(gridEndMin / 30) * 30);
+  if (gridEndMin <= gridStartMin) {
+    gridStartMin = DEFAULT_START_MIN;
+    gridEndMin = DEFAULT_END_MIN;
+  }
+
+  const dayIndexes = [...dayNeeded].sort((a, b) => a - b);
+  const expanded =
+    gridStartMin < DEFAULT_START_MIN ||
+    gridEndMin > DEFAULT_END_MIN ||
+    dayIndexes.some((i) => i > 4);
+
+  return { dayIndexes, gridStartMin, gridEndMin, expanded };
+}
+
+function sessionMinutesOnDay(
+  s: Session,
+  ymd: string,
+): { startMin: number; endMin: number } {
+  const start = parseSqlDate(s.startedAt);
+  const end = parseSqlDate(s.endedAt ?? new Date().toISOString());
+  let startMin = minutesFromMidnightCst(start);
+  let endMin = minutesFromMidnightCst(end);
+  if (chicagoYmd(start) < ymd) startMin = 0;
+  if (chicagoYmd(end) > ymd) endMin = 24 * 60;
+  // Same-calendar-day midnight end
+  if (endMin === 0 && chicagoYmd(end) === ymd && end > start) endMin = 24 * 60;
+  return { startMin, endMin };
+}
+
 /** Stable HSL palette per timer id so overlapping blocks stay distinguishable. */
 function colorForTimer(timerId: number): { bg: string; border: string } {
   const hue = ((Number(timerId) || 0) * 47) % 360;
@@ -177,16 +254,38 @@ function colorForTimer(timerId: number): { bg: string; border: string } {
   };
 }
 
-function buildHourLabels() {
-  return [
-    { key: '830', label: '8:30 AM', flex: 2 },
-    { key: '10', label: '10:00 AM', flex: 2 },
-    { key: '12', label: '12:00 PM', flex: 2 },
-    { key: '14', label: '2:00 PM', flex: 2 },
-    { key: '17', label: '5:00 PM', flex: 1 },
-    { key: '21', label: '9:00 PM', flex: 1 },
-    { key: '00', label: '12:00 AM', flex: 1 },
-  ];
+function buildHourLabels(gridStartMin: number, gridEndMin: number) {
+  const span = Math.max(gridEndMin - gridStartMin, 30);
+  // Aim for ~5–7 labels across the visible window.
+  const step = span <= 240 ? 30 : span <= 480 ? 60 : 120;
+  const labels: { key: string; label: string; flex: number }[] = [];
+  let t = gridStartMin;
+  while (t < gridEndMin) {
+    const next = Math.min(t + step, gridEndMin);
+    labels.push({
+      key: String(t),
+      label: formatMinutesLabel(t),
+      flex: Math.max(1, next - t),
+    });
+    t = next;
+  }
+  if (labels.length === 0) {
+    labels.push({
+      key: 'start',
+      label: formatMinutesLabel(gridStartMin),
+      flex: 1,
+    });
+  }
+  return labels;
+}
+
+function formatMinutesLabel(mins: number): string {
+  const clamped = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
+  const h24 = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  const suffix = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
 function sessionTouchesDay(s: Session, ymd: string): boolean {
@@ -202,51 +301,29 @@ function minutesFromMidnightCst(d: Date): number {
     minute: '2-digit',
     hour12: false,
   }).formatToParts(d);
-  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
+  let hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
   const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0);
+  // Some engines emit 24 for midnight
+  if (hour === 24) hour = 0;
   return hour * 60 + minute;
 }
 
 function blockStyle(
   s: Session,
   ymd: string,
-  showAfter: boolean,
+  gridStartMin: number,
+  gridEndMin: number,
 ): CSSProperties | null {
-  const start = parseSqlDate(s.startedAt);
-  const end = parseSqlDate(s.endedAt ?? new Date().toISOString());
-  const dayStartMin = BUSINESS_START.h * 60 + BUSINESS_START.m;
-  const dayEndMin = showAfter
-    ? AFTER_HOURS_END.h * 60 + AFTER_HOURS_END.m
-    : BUSINESS_END.h * 60 + BUSINESS_END.m;
-  const bizSpan = BUSINESS_END.h * 60 + BUSINESS_END.m - dayStartMin;
-  const afterSpan =
-    AFTER_HOURS_END.h * 60 +
-    AFTER_HOURS_END.m -
-    (AFTER_HOURS_START.h * 60 + AFTER_HOURS_START.m);
-
-  let startMin = minutesFromMidnightCst(start);
-  let endMin = minutesFromMidnightCst(end);
-  if (chicagoYmd(start) < ymd) startMin = dayStartMin;
-  if (chicagoYmd(end) > ymd) endMin = dayEndMin;
-
-  startMin = Math.max(startMin, dayStartMin);
-  endMin = Math.min(endMin, dayEndMin);
+  const { startMin: rawStart, endMin: rawEnd } = sessionMinutesOnDay(s, ymd);
+  const startMin = Math.max(rawStart, gridStartMin);
+  const endMin = Math.min(rawEnd, gridEndMin);
   if (endMin <= startMin) return null;
 
-  const toPct = (m: number) => {
-    if (m <= BUSINESS_END.h * 60 + BUSINESS_END.m) {
-      return ((m - dayStartMin) / bizSpan) * 72;
-    }
-    if (!showAfter) return 72;
-    const afterStart = AFTER_HOURS_START.h * 60 + AFTER_HOURS_START.m;
-    if (m < afterStart) return 72;
-    return 72 + ((m - afterStart) / afterSpan) * 28;
-  };
-
-  const top = toPct(startMin);
-  const bottom = toPct(endMin);
+  const span = gridEndMin - gridStartMin;
+  const top = ((startMin - gridStartMin) / span) * 100;
+  const height = ((endMin - startMin) / span) * 100;
   return {
     top: `${top}%`,
-    height: `${Math.max(bottom - top, 3)}%`,
+    height: `${Math.max(height, 3)}%`,
   };
 }
