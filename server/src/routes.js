@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-const TIMER_TYPES = new Set(['Epic', 'Feature', 'User Story', 'Task']);
+const TIMER_TYPES = new Set(['Epic', 'Feature', 'User Story', 'Task', 'Other']);
 const BUCKETS = new Set(['closed', 'open', 'future']);
 
 export function createRouter(repo) {

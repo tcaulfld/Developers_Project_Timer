@@ -283,6 +283,7 @@ textarea {
 .chip.type-feature { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 40%, var(--stroke)); }
 .chip.type-story { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--stroke)); }
 .chip.type-task { color: var(--text-muted); }
+.chip.type-other { color: #9bb0c0; border-color: color-mix(in srgb, #9bb0c0 40%, var(--stroke)); }
 
 .info-btn {
   min-width: 48px;

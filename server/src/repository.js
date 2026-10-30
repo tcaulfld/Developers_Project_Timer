@@ -8,13 +8,14 @@ export function createRepository(db) {
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
   );
 
+  // Totals are whole minutes only (HH:MM) — floor seconds away in SQL.
   const listTimers = db.prepare(`
     SELECT t.*,
       (SELECT s.id FROM sessions s WHERE s.timer_id = t.id AND s.ended_at IS NULL LIMIT 1) AS active_session_id,
       (SELECT COALESCE(SUM(
-          CAST((julianday(COALESCE(s.ended_at, datetime('now'))) - julianday(s.started_at)) * 86400 AS INTEGER)
+          CAST((julianday(COALESCE(s.ended_at, datetime('now'))) - julianday(s.started_at)) * 1440 AS INTEGER)
         ), 0)
-       FROM sessions s WHERE s.timer_id = t.id) AS total_seconds
+       FROM sessions s WHERE s.timer_id = t.id) AS total_minutes
     FROM timers t
     ORDER BY t.updated_at DESC, t.id DESC
   `);
@@ -23,9 +24,9 @@ export function createRepository(db) {
     SELECT t.*,
       (SELECT s.id FROM sessions s WHERE s.timer_id = t.id AND s.ended_at IS NULL LIMIT 1) AS active_session_id,
       (SELECT COALESCE(SUM(
-          CAST((julianday(COALESCE(s.ended_at, datetime('now'))) - julianday(s.started_at)) * 86400 AS INTEGER)
+          CAST((julianday(COALESCE(s.ended_at, datetime('now'))) - julianday(s.started_at)) * 1440 AS INTEGER)
         ), 0)
-       FROM sessions s WHERE s.timer_id = t.id) AS total_seconds
+       FROM sessions s WHERE s.timer_id = t.id) AS total_minutes
     FROM timers t
     WHERE t.id = ?
   `);
@@ -110,7 +111,7 @@ export function createRepository(db) {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       activeSessionId: row.active_session_id ?? null,
-      totalSeconds: row.total_seconds ?? 0,
+      totalMinutes: row.total_minutes ?? 0,
       isRunning: Boolean(row.active_session_id),
     };
   }

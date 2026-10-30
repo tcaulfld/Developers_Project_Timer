@@ -38,7 +38,7 @@ function migrate(db) {
       label TEXT NOT NULL,
       project_number TEXT,
       description TEXT,
-      type TEXT NOT NULL CHECK (type IN ('Epic', 'Feature', 'User Story', 'Task')),
+      type TEXT NOT NULL CHECK (type IN ('Epic', 'Feature', 'User Story', 'Task', 'Other')),
       epic_id INTEGER REFERENCES timers(id) ON DELETE SET NULL,
       bucket TEXT NOT NULL CHECK (bucket IN ('closed', 'open', 'future')) DEFAULT 'open',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -63,4 +63,42 @@ function migrate(db) {
   if (!row) {
     db.prepare(`INSERT INTO settings (key, value) VALUES ('allow_multiple_active', 'false')`).run();
   }
+
+  migrateSchemaVersion(db);
+}
+
+/** Recreate timers table so CHECK allows 'Other' (SQLite cannot ALTER CHECK). */
+function migrateSchemaVersion(db) {
+  const ver = db.prepare(`SELECT value FROM settings WHERE key = 'schema_version'`).get();
+  const current = ver ? Number(ver.value) : 1;
+  if (current >= 2) return;
+
+  const rebuild = db.transaction(() => {
+    // Parent DROP would fail while sessions FK points at timers.
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE timers_v2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        label TEXT NOT NULL,
+        project_number TEXT,
+        description TEXT,
+        type TEXT NOT NULL CHECK (type IN ('Epic', 'Feature', 'User Story', 'Task', 'Other')),
+        epic_id INTEGER,
+        bucket TEXT NOT NULL CHECK (bucket IN ('closed', 'open', 'future')) DEFAULT 'open',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO timers_v2 (id, label, project_number, description, type, epic_id, bucket, created_at, updated_at)
+        SELECT id, label, project_number, description, type, epic_id, bucket, created_at, updated_at FROM timers;
+      DROP TABLE timers;
+      ALTER TABLE timers_v2 RENAME TO timers;
+      CREATE INDEX IF NOT EXISTS idx_timers_bucket ON timers(bucket);
+    `);
+    db.prepare(
+      `INSERT INTO settings (key, value) VALUES ('schema_version', '2')
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    ).run();
+    db.pragma('foreign_keys = ON');
+  });
+  rebuild();
 }

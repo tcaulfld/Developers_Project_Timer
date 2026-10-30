@@ -1,5 +1,5 @@
 export type Bucket = 'closed' | 'open' | 'future';
-export type TimerType = 'Epic' | 'Feature' | 'User Story' | 'Task';
+export type TimerType = 'Epic' | 'Feature' | 'User Story' | 'Task' | 'Other';
 
 export interface Timer {
   id: number;
@@ -12,7 +12,8 @@ export interface Timer {
   createdAt: string;
   updatedAt: string;
   activeSessionId: number | null;
-  totalSeconds: number;
+  /** Whole minutes only — UI shows HH:MM. */
+  totalMinutes: number;
   isRunning: boolean;
 }
 

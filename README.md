@@ -7,8 +7,9 @@ Touch-friendly developer project timer for a 1920×720 / 12.3" display. Vite + R
 - **Buckets:** Closed · Open · Future — create in any, move via edit
 - **Timers:** Large tap targets; tap to start/pause; totals persist and resume
 - **Sessions:** Info button → start/end history; periods are editable
-- **Calendar:** M–F work week (Sat after-hours column), America/Chicago; business 8:30–17:00; after-hours Thu/Fri/Sat 21:00–00:00; browse past weeks; sprint markers (Wed–Tue, Q4 Sprint 3 starts 2026-11-04)
-- **Hierarchy:** Epic | Feature | User Story | Task; Features/Stories/Tasks can link to an Epic / project number
+- **Calendar:** M–F work week (Sat after-hours column), America/Chicago; business 8:30 AM–5:00 PM; after-hours Thu/Fri/Sat 9:00 PM–12:00 AM (12-hour labels); browse past weeks; sprint markers (Wed–Tue, Q4 Sprint 3 starts 2026-11-04)
+- **Hierarchy:** Epic | Feature | User Story | Task | Other; Features/Stories/Tasks can link to an Epic / project number
+- **Time display:** Timer totals are whole minutes (HH:MM); calendar uses 12-hour times (e.g. 8:30 AM)
 - **Settings:** Allow multiple active timers (default off — single-active enforced)
 - **Theme:** Dark default with light/dark toggle
 - **Auth:** Single-user, no login; `users` table reserved for salted password hashes later

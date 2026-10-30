@@ -56,7 +56,7 @@ export function CalendarView({ onClose }: Props) {
         <div className="modal-header">
           <div>
             <h2>Work week</h2>
-            <p>CST · 8:30–17:00 · After-hours Thu/Fri/Sat 21:00–00:00</p>
+            <p>CST · 8:30 AM–5:00 PM · After-hours Thu/Fri/Sat 9:00 PM–12:00 AM</p>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
             ✕
@@ -165,13 +165,13 @@ export function CalendarView({ onClose }: Props) {
 
 function buildHourLabels() {
   return [
-    { key: '830', label: '8:30', flex: 2 },
-    { key: '10', label: '10:00', flex: 2 },
-    { key: '12', label: '12:00', flex: 2 },
-    { key: '14', label: '14:00', flex: 2 },
-    { key: '17', label: '17:00', flex: 1 },
-    { key: '21', label: '21:00', flex: 1 },
-    { key: '00', label: '00:00', flex: 1 },
+    { key: '830', label: '8:30 AM', flex: 2 },
+    { key: '10', label: '10:00 AM', flex: 2 },
+    { key: '12', label: '12:00 PM', flex: 2 },
+    { key: '14', label: '2:00 PM', flex: 2 },
+    { key: '17', label: '5:00 PM', flex: 1 },
+    { key: '21', label: '9:00 PM', flex: 1 },
+    { key: '00', label: '12:00 AM', flex: 1 },
   ];
 }
 

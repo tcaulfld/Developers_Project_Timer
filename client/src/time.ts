@@ -2,12 +2,12 @@
 
 const TZ = 'America/Chicago';
 
-export function formatDuration(totalSeconds: number): string {
-  const s = Math.max(0, Math.floor(totalSeconds));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+/** Format whole minutes as HH:MM (no seconds). */
+export function formatDuration(totalMinutes: number): string {
+  const mins = Math.max(0, Math.floor(totalMinutes));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 export function parseSqlDate(value: string): Date {
@@ -29,15 +29,18 @@ export function formatDateTimeCst(value: string): string {
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    hour12: true,
   }).format(d);
 }
 
+/** 12-hour clock with AM/PM, e.g. "8:30 AM". */
 export function formatTimeCst(value: string | Date): string {
   const d = typeof value === 'string' ? parseSqlDate(value) : value;
   return new Intl.DateTimeFormat('en-US', {
     timeZone: TZ,
     hour: 'numeric',
     minute: '2-digit',
+    hour12: true,
   }).format(d);
 }
 

@@ -15,13 +15,14 @@ export function TimerCard({ timer, syncedAt, onToggle, onInfo, onEdit }: Props) 
 
   useEffect(() => {
     if (!timer.isRunning) return;
+    // Tick often enough to roll HH:MM when a minute elapses.
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [timer.isRunning, timer.activeSessionId, syncedAt]);
 
-  const liveSeconds = timer.isRunning
-    ? timer.totalSeconds + Math.max(0, Math.floor((now - syncedAt) / 1000))
-    : timer.totalSeconds;
+  const liveMinutes = timer.isRunning
+    ? timer.totalMinutes + Math.max(0, Math.floor((now - syncedAt) / 60000))
+    : timer.totalMinutes;
 
   const typeClass =
     timer.type === 'Epic'
@@ -30,7 +31,9 @@ export function TimerCard({ timer, syncedAt, onToggle, onInfo, onEdit }: Props) 
         ? 'type-feature'
         : timer.type === 'User Story'
           ? 'type-story'
-          : 'type-task';
+          : timer.type === 'Other'
+            ? 'type-other'
+            : 'type-task';
 
   return (
     <article
@@ -73,7 +76,7 @@ export function TimerCard({ timer, syncedAt, onToggle, onInfo, onEdit }: Props) 
       {timer.description ? <p className="timer-sub">{timer.description}</p> : null}
       <div className="timer-footer">
         <span className={`elapsed${timer.isRunning ? ' running' : ''}`}>
-          {formatDuration(liveSeconds)}
+          {formatDuration(liveMinutes)}
         </span>
         <span className={`status-dot${timer.isRunning ? ' on' : ''}`} />
       </div>

@@ -10,7 +10,7 @@ interface Props {
   onDelete?: (id: number) => Promise<void>;
 }
 
-const TYPES: TimerType[] = ['Epic', 'Feature', 'User Story', 'Task'];
+const TYPES: TimerType[] = ['Epic', 'Feature', 'User Story', 'Task', 'Other'];
 const BUCKETS: { id: Bucket; label: string }[] = [
   { id: 'open', label: 'Open' },
   { id: 'future', label: 'Future' },
@@ -36,7 +36,7 @@ export function TimerFormModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const needsEpicLink = type !== 'Epic';
+  const needsEpicLink = type !== 'Epic' && type !== 'Other';
 
   const epicOptions = useMemo(
     () => epics.filter((e) => e.id !== initial?.id),
@@ -81,7 +81,7 @@ export function TimerFormModal({
         <div className="modal-header">
           <div>
             <h2>{initial ? 'Edit timer' : 'New timer'}</h2>
-            <p>Epic · Feature · User Story · Task — all fields editable.</p>
+            <p>Epic · Feature · User Story · Task · Other — all fields editable.</p>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
             ✕
