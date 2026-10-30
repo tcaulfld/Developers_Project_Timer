@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Timer } from '../types';
-import { formatDuration } from '../time';
+import { formatDuration, minutesFromTimer } from '../time';
 
 interface Props {
   timer: Timer;
@@ -20,9 +20,10 @@ export function TimerCard({ timer, syncedAt, onToggle, onInfo, onEdit }: Props) 
     return () => window.clearInterval(id);
   }, [timer.isRunning, timer.activeSessionId, syncedAt]);
 
+  const baseMinutes = minutesFromTimer(timer);
   const liveMinutes = timer.isRunning
-    ? timer.totalMinutes + Math.max(0, Math.floor((now - syncedAt) / 60000))
-    : timer.totalMinutes;
+    ? baseMinutes + Math.max(0, Math.floor((now - syncedAt) / 60000))
+    : baseMinutes;
 
   const typeClass =
     timer.type === 'Epic'
