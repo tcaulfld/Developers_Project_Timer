@@ -1,0 +1,17 @@
+{
+  "name": "developers-project-timer-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "build": "node -e \"console.log('server: no transpile step')\"",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "cors": "^2.8.5",
+    "developers-project-timer": "file:..",
+    "express": "^4.21.2"
+  }
+}
