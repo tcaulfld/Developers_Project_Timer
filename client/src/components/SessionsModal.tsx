@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../api';
-import type { Session, Timer } from '../types';
+import type { Session, Timer, UserStoryWorkLabel } from '../types';
+import { USER_STORY_WORK_LABELS } from '../types';
 import { formatDateTimeCst, toSqlDate } from '../time';
 
 interface Props {
@@ -11,11 +12,14 @@ interface Props {
 }
 
 export function SessionsModal({ timer, onClose, onChanged, onEditTimer }: Props) {
+  const isUserStory = timer.type === 'User Story';
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Session | null>(null);
   const [startedAt, setStartedAt] = useState('');
   const [endedAt, setEndedAt] = useState('');
+  const [workLabel, setWorkLabel] = useState<UserStoryWorkLabel | ''>('');
+  const [newWorkLabel, setNewWorkLabel] = useState<UserStoryWorkLabel | ''>('');
 
   async function load() {
     try {
@@ -33,6 +37,7 @@ export function SessionsModal({ timer, onClose, onChanged, onEditTimer }: Props)
     setEditing(s);
     setStartedAt(toLocalInput(s.startedAt));
     setEndedAt(s.endedAt ? toLocalInput(s.endedAt) : '');
+    setWorkLabel(s.workLabel ?? '');
   }
 
   async function saveEdit(e: FormEvent) {
@@ -42,6 +47,9 @@ export function SessionsModal({ timer, onClose, onChanged, onEditTimer }: Props)
       await api.updateSession(editing.id, {
         startedAt: fromLocalInput(startedAt),
         endedAt: endedAt ? fromLocalInput(endedAt) : null,
+        ...(isUserStory
+          ? { workLabel: workLabel === '' ? null : workLabel }
+          : { workLabel: null }),
       });
       setEditing(null);
       await load();
@@ -60,6 +68,7 @@ export function SessionsModal({ timer, onClose, onChanged, onEditTimer }: Props)
             <p>
               {timer.label}
               {timer.projectNumber ? ` · ${timer.projectNumber}` : ''}
+              {isUserStory ? ' · User Story labels' : ''}
             </p>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
@@ -90,6 +99,26 @@ export function SessionsModal({ timer, onClose, onChanged, onEditTimer }: Props)
                 onChange={(e) => setEndedAt(e.target.value)}
               />
             </div>
+            <div className="field full">
+              <label htmlFor="workLabel">Work label</label>
+              <select
+                id="workLabel"
+                value={workLabel}
+                disabled={!isUserStory}
+                onChange={(e) =>
+                  setWorkLabel((e.target.value || '') as UserStoryWorkLabel | '')
+                }
+              >
+                <option value="">
+                  {isUserStory ? 'None' : 'N/A (User Story only)'}
+                </option>
+                {USER_STORY_WORK_LABELS.map((label) => (
+                  <option key={label} value={label}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="modal-actions full">
               <button type="button" className="ghost-btn" onClick={() => setEditing(null)}>
                 Cancel
@@ -114,6 +143,11 @@ export function SessionsModal({ timer, onClose, onChanged, onEditTimer }: Props)
                   <div>{formatDateTimeCst(s.startedAt)}</div>
                   <div style={{ color: 'var(--text-muted)' }}>
                     → {s.endedAt ? formatDateTimeCst(s.endedAt) : 'Active now'}
+                    {s.workLabel ? (
+                      <span className="chip" style={{ marginLeft: 8 }}>
+                        {s.workLabel}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <div className="actions">
@@ -138,6 +172,26 @@ export function SessionsModal({ timer, onClose, onChanged, onEditTimer }: Props)
           )}
         </div>
 
+        {isUserStory ? (
+          <div className="field" style={{ marginTop: 16 }}>
+            <label htmlFor="newWorkLabel">Label for new session</label>
+            <select
+              id="newWorkLabel"
+              value={newWorkLabel}
+              onChange={(e) =>
+                setNewWorkLabel((e.target.value || '') as UserStoryWorkLabel | '')
+              }
+            >
+              <option value="">None</option>
+              {USER_STORY_WORK_LABELS.map((label) => (
+                <option key={label} value={label}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
         <div className="modal-actions">
           <button
             type="button"
@@ -160,6 +214,11 @@ export function SessionsModal({ timer, onClose, onChanged, onEditTimer }: Props)
                 timerId: timer.id,
                 startedAt: toSqlDate(earlier),
                 endedAt: toSqlDate(now),
+                workLabel: isUserStory
+                  ? newWorkLabel === ''
+                    ? null
+                    : newWorkLabel
+                  : null,
               });
               await load();
               onChanged();
