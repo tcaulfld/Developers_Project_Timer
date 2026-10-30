@@ -111,7 +111,14 @@ export function createRepository(db) {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       activeSessionId: row.active_session_id ?? null,
-      totalMinutes: row.total_minutes ?? 0,
+      totalMinutes: Number.isFinite(Number(row.total_minutes))
+        ? Math.max(0, Math.floor(Number(row.total_minutes)))
+        : 0,
+      // Compat for any client still reading totalSeconds (always whole minutes * 60).
+      totalSeconds:
+        (Number.isFinite(Number(row.total_minutes))
+          ? Math.max(0, Math.floor(Number(row.total_minutes)))
+          : 0) * 60,
       isRunning: Boolean(row.active_session_id),
     };
   }

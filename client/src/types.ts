@@ -14,6 +14,8 @@ export interface Timer {
   activeSessionId: number | null;
   /** Whole minutes only — UI shows HH:MM. */
   totalMinutes: number;
+  /** @deprecated Prefer totalMinutes; kept for older API payloads. */
+  totalSeconds?: number;
   isRunning: boolean;
 }
 

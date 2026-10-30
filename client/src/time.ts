@@ -2,9 +2,25 @@
 
 const TZ = 'America/Chicago';
 
-/** Format whole minutes as HH:MM (no seconds). */
+/**
+ * Resolve whole minutes from a timer payload.
+ * Prefers totalMinutes; falls back to totalSeconds for older API responses.
+ */
+export function minutesFromTimer(timer: {
+  totalMinutes?: number | null;
+  totalSeconds?: number | null;
+}): number {
+  const mins = Number(timer.totalMinutes);
+  if (Number.isFinite(mins)) return Math.max(0, Math.floor(mins));
+  const secs = Number(timer.totalSeconds);
+  if (Number.isFinite(secs)) return Math.max(0, Math.floor(secs / 60));
+  return 0;
+}
+
+/** Format whole minutes as HH:MM (no seconds). Never returns NaN:NaN. */
 export function formatDuration(totalMinutes: number): string {
-  const mins = Math.max(0, Math.floor(totalMinutes));
+  const n = Number(totalMinutes);
+  const mins = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
