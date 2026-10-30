@@ -9,7 +9,6 @@ import {
   BUSINESS_START,
   addDays,
   chicagoYmd,
-  formatTimeCst,
   parseSqlDate,
   sprintsOverlapping,
   startOfWorkWeek,
@@ -142,14 +141,20 @@ export function CalendarView({ onClose }: Props) {
                   {daySessions.map((s) => {
                     const style = blockStyle(s, ymd, showAfter);
                     if (!style) return null;
+                    const colors = colorForTimer(s.timerId);
+                    const name = (s.projectNumber || s.timerLabel || 'Timer').trim();
                     return (
-                      <div key={s.id} className="cal-block" style={style}>
-                        {s.projectNumber ? `${s.projectNumber} · ` : ''}
-                        {s.timerLabel}
-                        <div style={{ opacity: 0.8, fontWeight: 500 }}>
-                          {formatTimeCst(s.startedAt)}
-                          {s.endedAt ? `–${formatTimeCst(s.endedAt)}` : '→'}
-                        </div>
+                      <div
+                        key={s.id}
+                        className="cal-block"
+                        style={{
+                          ...style,
+                          background: colors.bg,
+                          borderColor: colors.border,
+                        }}
+                        title={name}
+                      >
+                        {name}
                       </div>
                     );
                   })}
@@ -161,6 +166,15 @@ export function CalendarView({ onClose }: Props) {
       </div>
     </div>
   );
+}
+
+/** Stable HSL palette per timer id so overlapping blocks stay distinguishable. */
+function colorForTimer(timerId: number): { bg: string; border: string } {
+  const hue = ((Number(timerId) || 0) * 47) % 360;
+  return {
+    bg: `hsla(${hue}, 52%, 38%, 0.72)`,
+    border: `hsla(${hue}, 65%, 58%, 0.95)`,
+  };
 }
 
 function buildHourLabels() {
