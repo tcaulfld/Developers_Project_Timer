@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { normalizeWorkLabel } from './workLabels.js';
 
 const TIMER_TYPES = new Set(['Epic', 'Feature', 'User Story', 'Task', 'Other']);
 const BUCKETS = new Set(['closed', 'open', 'future']);
@@ -98,15 +97,6 @@ export function createRouter(repo) {
     res.json(repo.listSessions(timer.id));
   });
 
-  /** Rollup prep: totals by User Story work label (TD|Development|UTS|Review|Release). */
-  router.get('/timers/:id/label-totals', (req, res) => {
-    const result = repo.userStoryLabelTotals(Number(req.params.id));
-    if (result.error === 'not_found') {
-      return res.status(404).json({ error: 'Timer not found' });
-    }
-    res.json(result);
-  });
-
   router.post('/sessions', (req, res) => {
     const body = req.body ?? {};
     if (!body.timerId || !body.startedAt) {
@@ -114,23 +104,10 @@ export function createRouter(repo) {
     }
     const timer = repo.getTimer(Number(body.timerId));
     if (!timer) return res.status(404).json({ error: 'Timer not found' });
-
-    let workLabel = null;
-    if (timer.type === 'User Story') {
-      const normalized = normalizeWorkLabel(body.workLabel, { allowNull: true });
-      if (normalized === undefined) {
-        return res.status(400).json({
-          error: 'workLabel must be TD, Development, UTS, Review, Release, or null',
-        });
-      }
-      workLabel = normalized;
-    }
-
     const session = repo.createSession({
       timerId: Number(body.timerId),
       startedAt: normalizeSqlDate(body.startedAt),
       endedAt: body.endedAt ? normalizeSqlDate(body.endedAt) : null,
-      workLabel,
     });
     res.status(201).json(session);
   });
@@ -140,7 +117,7 @@ export function createRouter(repo) {
     const existing = repo.getSession(Number(req.params.id));
     if (!existing) return res.status(404).json({ error: 'Session not found' });
 
-    const patch = {
+    const session = repo.updateSession(Number(req.params.id), {
       startedAt: body.startedAt ? normalizeSqlDate(body.startedAt) : undefined,
       endedAt:
         body.endedAt === null
@@ -148,24 +125,7 @@ export function createRouter(repo) {
           : body.endedAt
             ? normalizeSqlDate(body.endedAt)
             : undefined,
-    };
-
-    if (Object.prototype.hasOwnProperty.call(body, 'workLabel')) {
-      const timer = repo.getTimer(existing.timerId);
-      if (timer?.type === 'User Story') {
-        const normalized = normalizeWorkLabel(body.workLabel, { allowNull: true });
-        if (normalized === undefined) {
-          return res.status(400).json({
-            error: 'workLabel must be TD, Development, UTS, Review, Release, or null',
-          });
-        }
-        patch.workLabel = normalized;
-      } else {
-        patch.workLabel = null;
-      }
-    }
-
-    const session = repo.updateSession(Number(req.params.id), patch);
+    });
     if (!session) return res.status(404).json({ error: 'Session not found' });
     res.json(session);
   });

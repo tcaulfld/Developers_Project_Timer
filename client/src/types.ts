@@ -1,16 +1,6 @@
 export type Bucket = 'closed' | 'open' | 'future';
 export type TimerType = 'Epic' | 'Feature' | 'User Story' | 'Task' | 'Other';
 
-/** User Story session work labels (persisted on sessions.work_label). */
-export const USER_STORY_WORK_LABELS = [
-  'TD',
-  'Development',
-  'UTS',
-  'Review',
-  'Release',
-] as const;
-export type UserStoryWorkLabel = (typeof USER_STORY_WORK_LABELS)[number];
-
 export interface Timer {
   id: number;
   label: string;
@@ -34,21 +24,11 @@ export interface Session {
   timerId: number;
   startedAt: string;
   endedAt: string | null;
-  /** User Story only: TD | Development | UTS | Review | Release */
-  workLabel: UserStoryWorkLabel | null;
   createdAt: string;
   updatedAt: string;
   timerLabel?: string;
   projectNumber?: string | null;
   timerType?: TimerType;
-}
-
-export interface LabelTotals {
-  timerId: number;
-  type: TimerType;
-  labels: UserStoryWorkLabel[];
-  totals: { workLabel: UserStoryWorkLabel; totalMinutes: number }[];
-  note?: string;
 }
 
 export interface Settings {

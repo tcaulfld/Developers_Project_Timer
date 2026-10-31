@@ -18,8 +18,8 @@ export function openDatabase(dataDir = process.env.DATA_DIR || path.resolve('dat
 }
 
 function migrate(db) {
-  // Base tables only — never reference columns that older volumes lack.
-  // work_label is added idempotently in ensureSessionsWorkLabel() after this.
+  // Base CREATE TABLE IF NOT EXISTS must not assume columns that older
+  // Docker volumes lack, and must not CREATE INDEX on columns added later.
   db.exec(`
     -- Extension point: future multi-user auth (salted password hashes only — never plaintext).
     CREATE TABLE IF NOT EXISTS users (
@@ -76,40 +76,18 @@ function setSchemaVersion(db, version) {
   ).run(String(version));
 }
 
-function hasColumn(db, table, column) {
-  return db
-    .prepare(`PRAGMA table_info(${table})`)
-    .all()
-    .some((c) => c.name === column);
-}
-
 /**
- * Idempotent: add sessions.work_label + index on existing Docker volumes
- * and on fresh DBs whose CREATE TABLE omitted the column (base schema above).
- * Safe to run every boot; never assumes the column already exists.
+ * Incremental migrations.
+ * Note: a former v3 added optional sessions.work_label for User Story labels;
+ * that feature was reverted. Leftover work_label columns/indexes on existing
+ * volumes are ignored (unused) so we never crash or wipe data.
  */
-function ensureSessionsWorkLabel(db) {
-  if (!hasColumn(db, 'sessions', 'work_label')) {
-    // User Story session taxonomy (TD|Development|UTS|Review|Release); NULL otherwise.
-    // Indexed for later productivity rollups by story+label.
-    db.exec(`
-      ALTER TABLE sessions ADD COLUMN work_label TEXT
-        CHECK (work_label IS NULL OR work_label IN ('TD', 'Development', 'UTS', 'Review', 'Release'));
-    `);
-  }
-  db.exec(
-    `CREATE INDEX IF NOT EXISTS idx_sessions_work_label ON sessions(timer_id, work_label)`,
-  );
-}
-
-/** Incremental SQLite migrations (CHECK changes need rebuilds; columns use ALTER). */
 function migrateSchemaVersion(db) {
   const ver = db.prepare(`SELECT value FROM settings WHERE key = 'schema_version'`).get();
   let current = ver ? Number(ver.value) : 1;
 
   if (current < 2) {
     const rebuild = db.transaction(() => {
-      // Parent DROP would fail while sessions FK points at timers.
       db.pragma('foreign_keys = OFF');
       db.exec(`
         CREATE TABLE timers_v2 (
@@ -136,9 +114,6 @@ function migrateSchemaVersion(db) {
     current = 2;
   }
 
-  // v3: work_label — always ensure column/index first (idempotent), then bump version.
-  ensureSessionsWorkLabel(db);
-  if (current < 3) {
-    setSchemaVersion(db, 3);
-  }
+  // schema_version may already be 3 from the reverted work_label migration.
+  // Leave any existing work_label column unused; do not ADD or INDEX it again.
 }

@@ -1,8 +1,6 @@
 /**
  * Data-access layer. Keep SQL here so storage can be swapped later.
  */
-import { USER_STORY_WORK_LABELS } from './workLabels.js';
-
 export function createRepository(db) {
   const getSetting = db.prepare(`SELECT value FROM settings WHERE key = ?`);
   const setSetting = db.prepare(
@@ -72,31 +70,18 @@ export function createRepository(db) {
     `SELECT * FROM sessions WHERE ended_at IS NULL`,
   );
 
+  // Do not reference work_label — leftover column on some volumes is unused after revert.
   const insertSession = db.prepare(`
-    INSERT INTO sessions (timer_id, started_at, ended_at, work_label, created_at, updated_at)
-    VALUES (@timer_id, @started_at, @ended_at, @work_label, datetime('now'), datetime('now'))
+    INSERT INTO sessions (timer_id, started_at, ended_at, created_at, updated_at)
+    VALUES (@timer_id, @started_at, @ended_at, datetime('now'), datetime('now'))
   `);
 
   const updateSession = db.prepare(`
     UPDATE sessions SET
       started_at = @started_at,
       ended_at = @ended_at,
-      work_label = @work_label,
       updated_at = datetime('now')
     WHERE id = @id
-  `);
-
-  // Productivity rollup helper: minutes per work_label for one User Story timer.
-  const labelTotalsForTimer = db.prepare(`
-    SELECT s.work_label AS work_label,
-      COALESCE(SUM(
-        CAST(ROUND((julianday(COALESCE(s.ended_at, datetime('now'))) - julianday(s.started_at)) * 1440) AS INTEGER)
-      ), 0) AS total_minutes
-    FROM sessions s
-    WHERE s.timer_id = ?
-      AND s.work_label IS NOT NULL
-    GROUP BY s.work_label
-    ORDER BY s.work_label
   `);
 
   const deleteSession = db.prepare(`DELETE FROM sessions WHERE id = ?`);
@@ -145,7 +130,6 @@ export function createRepository(db) {
       timerId: row.timer_id,
       startedAt: row.started_at,
       endedAt: row.ended_at,
-      workLabel: row.work_label ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       timerLabel: row.timer_label,
@@ -233,7 +217,6 @@ export function createRepository(db) {
         timer_id: input.timerId,
         started_at: input.startedAt,
         ended_at: input.endedAt ?? null,
-        work_label: input.workLabel ?? null,
       });
       touchTimer.run(input.timerId);
       return mapSession(getSession.get(Number(info.lastInsertRowid)));
@@ -247,10 +230,6 @@ export function createRepository(db) {
         started_at: input.startedAt ?? existing.started_at,
         ended_at:
           input.endedAt !== undefined ? input.endedAt : existing.ended_at,
-        work_label:
-          input.workLabel !== undefined
-            ? input.workLabel
-            : existing.work_label,
       });
       touchTimer.run(existing.timer_id);
       return mapSession(getSession.get(id));
@@ -281,7 +260,6 @@ export function createRepository(db) {
         timer_id: timerId,
         started_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
         ended_at: null,
-        work_label: null,
       });
       touchTimer.run(timerId);
       return { timer: this.getTimer(timerId) };
@@ -295,42 +273,6 @@ export function createRepository(db) {
       endSession.run(active.id);
       touchTimer.run(timerId);
       return { timer: this.getTimer(timerId) };
-    },
-
-    /**
-     * Rollup prep: per-label minute totals for a User Story timer.
-     * Queryable shape for later productivity UI — not a full dashboard yet.
-     */
-    userStoryLabelTotals(timerId) {
-      const timer = this.getTimer(timerId);
-      if (!timer) return { error: 'not_found' };
-      if (timer.type !== 'User Story') {
-        return {
-          timerId,
-          type: timer.type,
-          labels: USER_STORY_WORK_LABELS,
-          totals: [],
-          note: 'Work labels apply only to User Story timers',
-        };
-      }
-      const rows = labelTotalsForTimer.all(timerId);
-      const byLabel = Object.fromEntries(
-        USER_STORY_WORK_LABELS.map((label) => [label, 0]),
-      );
-      for (const row of rows) {
-        if (row.work_label in byLabel) {
-          byLabel[row.work_label] = Number(row.total_minutes) || 0;
-        }
-      }
-      return {
-        timerId,
-        type: timer.type,
-        labels: USER_STORY_WORK_LABELS,
-        totals: USER_STORY_WORK_LABELS.map((label) => ({
-          workLabel: label,
-          totalMinutes: byLabel[label],
-        })),
-      };
     },
   };
 }

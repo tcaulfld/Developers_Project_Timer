@@ -1,12 +1,4 @@
-import type {
-  Bucket,
-  LabelTotals,
-  Session,
-  Settings,
-  Timer,
-  TimerInput,
-  UserStoryWorkLabel,
-} from './types';
+import type { Bucket, Session, Settings, Timer, TimerInput } from './types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -57,7 +49,6 @@ export const api = {
     timerId: number;
     startedAt: string;
     endedAt?: string | null;
-    workLabel?: UserStoryWorkLabel | null;
   }) =>
     request<Session>('/sessions', {
       method: 'POST',
@@ -66,11 +57,7 @@ export const api = {
 
   updateSession: (
     id: number,
-    input: {
-      startedAt?: string;
-      endedAt?: string | null;
-      workLabel?: UserStoryWorkLabel | null;
-    },
+    input: { startedAt?: string; endedAt?: string | null },
   ) =>
     request<Session>(`/sessions/${id}`, {
       method: 'PATCH',
@@ -84,8 +71,4 @@ export const api = {
     request<Session[]>(
       `/calendar/sessions?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
     ),
-
-  /** Rollup prep — minutes by User Story work label. */
-  labelTotals: (timerId: number) =>
-    request<LabelTotals>(`/timers/${timerId}/label-totals`),
 };

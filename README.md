@@ -56,9 +56,6 @@ Data volume: `timer-data` → `/data/timer.db`
 | GET | `/api/timers/:id/sessions` | |
 | POST/PATCH/DELETE | `/api/sessions` | editable periods |
 | GET | `/api/calendar/sessions?start=&end=` | |
-| GET | `/api/timers/:id/label-totals` | User Story work-label minute rollup (TD/Development/UTS/Review/Release) |
-
-User Story sessions may store `workLabel`: TD · Development · UTS · Review · Release (`sessions.work_label`).
 
 ## Architecture
 
