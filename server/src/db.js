@@ -18,6 +18,8 @@ export function openDatabase(dataDir = process.env.DATA_DIR || path.resolve('dat
 }
 
 function migrate(db) {
+  // Base tables only — never reference columns that older volumes lack.
+  // work_label is added idempotently in ensureSessionsWorkLabel() after this.
   db.exec(`
     -- Extension point: future multi-user auth (salted password hashes only — never plaintext).
     CREATE TABLE IF NOT EXISTS users (
@@ -45,16 +47,11 @@ function migrate(db) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    -- work_label: User Story session taxonomy (TD|Development|UTS|Review|Release).
-    -- NULL for non–User Story timers. Indexed for later productivity rollups by story+label.
     CREATE TABLE IF NOT EXISTS sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       timer_id INTEGER NOT NULL REFERENCES timers(id) ON DELETE CASCADE,
       started_at TEXT NOT NULL,
       ended_at TEXT,
-      work_label TEXT CHECK (
-        work_label IS NULL OR work_label IN ('TD', 'Development', 'UTS', 'Review', 'Release')
-      ),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -62,7 +59,6 @@ function migrate(db) {
     CREATE INDEX IF NOT EXISTS idx_timers_bucket ON timers(bucket);
     CREATE INDEX IF NOT EXISTS idx_sessions_timer ON sessions(timer_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_range ON sessions(started_at, ended_at);
-    CREATE INDEX IF NOT EXISTS idx_sessions_work_label ON sessions(timer_id, work_label);
   `);
 
   const row = db.prepare(`SELECT value FROM settings WHERE key = 'allow_multiple_active'`).get();
@@ -78,6 +74,32 @@ function setSchemaVersion(db, version) {
     `INSERT INTO settings (key, value) VALUES ('schema_version', ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
   ).run(String(version));
+}
+
+function hasColumn(db, table, column) {
+  return db
+    .prepare(`PRAGMA table_info(${table})`)
+    .all()
+    .some((c) => c.name === column);
+}
+
+/**
+ * Idempotent: add sessions.work_label + index on existing Docker volumes
+ * and on fresh DBs whose CREATE TABLE omitted the column (base schema above).
+ * Safe to run every boot; never assumes the column already exists.
+ */
+function ensureSessionsWorkLabel(db) {
+  if (!hasColumn(db, 'sessions', 'work_label')) {
+    // User Story session taxonomy (TD|Development|UTS|Review|Release); NULL otherwise.
+    // Indexed for later productivity rollups by story+label.
+    db.exec(`
+      ALTER TABLE sessions ADD COLUMN work_label TEXT
+        CHECK (work_label IS NULL OR work_label IN ('TD', 'Development', 'UTS', 'Review', 'Release'));
+    `);
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_sessions_work_label ON sessions(timer_id, work_label)`,
+  );
 }
 
 /** Incremental SQLite migrations (CHECK changes need rebuilds; columns use ALTER). */
@@ -114,19 +136,9 @@ function migrateSchemaVersion(db) {
     current = 2;
   }
 
+  // v3: work_label — always ensure column/index first (idempotent), then bump version.
+  ensureSessionsWorkLabel(db);
   if (current < 3) {
-    const cols = db.prepare(`PRAGMA table_info(sessions)`).all();
-    const hasWorkLabel = cols.some((c) => c.name === 'work_label');
-    if (!hasWorkLabel) {
-      // Existing DBs created before work_label; fresh installs already have the column.
-      db.exec(`
-        ALTER TABLE sessions ADD COLUMN work_label TEXT
-          CHECK (work_label IS NULL OR work_label IN ('TD', 'Development', 'UTS', 'Review', 'Release'));
-      `);
-    }
-    db.exec(
-      `CREATE INDEX IF NOT EXISTS idx_sessions_work_label ON sessions(timer_id, work_label)`,
-    );
     setSchemaVersion(db, 3);
   }
 }
